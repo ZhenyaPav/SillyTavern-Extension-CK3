@@ -26,12 +26,16 @@ DEFAULT_LOGS = Path.home() / '.local/share/Paradox Interactive/Crusader Kings II
 DEFAULT_STATE = ROOT / '.runtime/bridge'
 DEFAULT_ORIGIN = 'https://nova-st.pve.realm.bz'
 PREFIX = re.compile(r'^\[\d{2}:\d{2}:\d{2}\](?:\[[^\]\n]*\])+: ?')
+SOURCE_PREFIX = re.compile(r'^file: .+? line: \d+(?: \([^\r\n]*\))?: (?=STCK3_V1_BEGIN [a-z_]+$)')
 MAX_FRAME = 262144
 
 
 def plain(text):
     """Remove CK3 formatting while retaining prose, paragraphs, and link labels."""
-    text = re.sub(r'@[^!\s]+!', '', str(text))
+    # info_log serializes resolved GUI markup using control bytes, rather than
+    # the source localization's #format and @icon spellings.
+    text = re.sub(r'\x15(?:!|[^\s\x15]+[ \t]?)', '', str(text))
+    text = re.sub(r'[@\x16][^!\s]+!', '', text)
     text = re.sub(r'#(?:!|[A-Za-z_][A-Za-z_0-9;=.,+-]*\s*)', '', text)
     text = re.sub(r'\[([^\[\]|]+)\|[^\[\]]+\]', r'\1', text)
     return '\n'.join(line.rstrip() for line in text.splitlines()).strip()
@@ -46,6 +50,7 @@ class FrameParser:
 
     def feed(self, line):
         line = PREFIX.sub('', line.rstrip('\r\n'))
+        line = SOURCE_PREFIX.sub('', line)
         if line.startswith('STCK3_V1_BEGIN '):
             self.kind = line.split(' ', 1)[1].strip()
             self.fields, self.field, self.size = {}, None, 0

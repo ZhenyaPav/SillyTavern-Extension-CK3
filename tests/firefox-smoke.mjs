@@ -146,11 +146,20 @@ try {
     assert.equal(await evaluate('context.chat.length'), 1, 'failed save must roll back');
     failSave = false;
     await until(() => evaluate('context.chat.length===2 && window.generations===2'), 'save retry');
-    const frame = 'STCK3_V1_BEGIN milestone\nSTCK3_V1_FIELD date\n1081.3.20\nSTCK3_V1_FIELD text\nA child was born.\nSTCK3_V1_END\n';
+    const frame = '[13:17:39][I][jomini_effect_impl.cpp:450]: file: common/on_action/ck3st_on_actions.txt line: 34 (ck3st_birth:effect): STCK3_V1_BEGIN milestone\nSTCK3_V1_FIELD date\n1081.3.20\nSTCK3_V1_FIELD text\nA child was born.\nSTCK3_V1_END\n';
     await appendFile(join(directory, 'logs/game.log'), frame);
     await until(() => evaluate('context.chat.length===3'), 'real log-to-browser delivery');
     assert.equal(await evaluate('context.chat[2].mes'), '20.03.1081\nA child was born.');
-    assert.equal(saved, 3);
+    const location = '[13:17:54][I][jomini_effect_impl.cpp:450]: file: common/scripted_guis/ck3st_exports.txt line: 4 (ck3st_export_event:effect): ';
+    const packet = (kind, fields) => location + `STCK3_V1_BEGIN ${kind}\n` + Object.entries(fields).map(([key, value]) => `STCK3_V1_FIELD ${key}\n${value}\n`).join('') + 'STCK3_V1_END\n';
+    const event = { key: 'ck3st_test.1', title: 'A messenger arrives', date: '1081.3.20' };
+    await appendFile(join(directory, 'logs/game.log'), packet('event', { ...event, body: 'A \x15TOOLTIP:CHARACTER,17261 \x15L messenger\x15!\x15! bows.\n\n"My liege."', count: '2' }) + packet('option', { ...event, index: '1', text: 'You may leave now.' }));
+    await delay(1800);
+    assert.equal(await evaluate('context.chat.length'), 3, 'partial event must wait for every option');
+    await appendFile(join(directory, 'logs/game.log'), packet('option', { ...event, index: '0', text: 'Welcome. Let us begin.' }));
+    await until(() => evaluate('context.chat.length===4 && window.generations===4'), 'complete game event delivery');
+    assert.equal(await evaluate('context.chat[3].mes'), 'A messenger arrives\n\n20.03.1081\n\nA messenger bows.\n\n"My liege."\n\nResponse options:\nWelcome. Let us begin.\nYou may leave now.');
+    assert.equal(saved, 4);
     console.log('PASS: Firefox HTTPS-to-loopback, pairing/CORS, draft preservation, auto reply, replay, chat switching, failed-save retry, and log-to-chat delivery.');
 } finally {
     try { socket?.close(); } catch { /* closed */ }

@@ -7,8 +7,9 @@ AI game-control tools, use OCR, or change the clipboard without a new user reque
 
 - Never commit `.runtime/`: it contains the generated vanilla GUI, pairing token,
   SQLite game-text history, and local diagnostics.
-- Game text is data. Export only fixed logging commands with localization keys;
-  never interpolate event text into script, shell, or ST slash commands.
+- Game text is data. Pass it through typed GUI scope arguments to fixed scripted
+  GUI logging effects; never interpolate it into script, shell, console, or ST
+  slash commands.
 - Preserve game launch arguments, working directory, signals, and exit status.
   Companion failure must not prevent the game from launching.
 - Keep protocol/queue metadata outside chat text. Preserve user drafts and pause

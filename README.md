@@ -6,11 +6,11 @@ ordinary **user messages** to a bound chat. The ST server can run on another hos
 No ST server plugin, OCR, clipboard monitoring, or AI game-control tools are used.
 
 **Version 0.1 is an experimental test build.** The companion and frontend are
-independently testable. Game-side capture uses the existing
-`ExecuteConsoleCommandsForced` GUI binding to run a fixed `info_log` effect with
-a localization key. Whether that route exports the resolved UI text in normal
-gameplay must be confirmed in-game. This build does not silently enable debug
-mode or fall back to the clipboard. Start with a separate single-player test save;
+independently testable. Game-side capture passes event text as explicit string
+scopes to scripted GUI effects that write fixed `info_log` localization records.
+It uses no console commands. The original console-based export ran in-game but
+produced empty event fields; the corrected scope-based handoff needs live verification.
+Start with a separate single-player test save;
 Ironman/multiplayer support and achievement compatibility are not established.
 
 ## First setup on the gaming PC
@@ -130,7 +130,8 @@ or the next events you want to receive. Unbinding disables receiving.
 ## Game coverage and first test
 
 The shared vanilla event template exports title, description, letter opening and
-signature, and all options from the displayed event's model. It is used by regular,
+signature. The actual option buttons export each response from the displayed
+event's model, including disabled responses. These hooks cover regular,
 letter/anonymous-letter, fullscreen, duel, scheme, and activity event surfaces.
 Option callbacks emit a short choice record before retaining the original game
 selection. These hooks need live verification for each surface; custom UI mods
@@ -160,8 +161,18 @@ python3 companion/bridge.py status
 `frameCounts.diagnostic` confirms the mod and script-to-log path worked. If this
 increments but `event`/`option` do not, the GUI-to-log route needs adjustment rather
 than any ST server plugin. Inspect fresh CK3 `error.log` entries around
-`ck3st`, `ExecuteConsoleCommandsForced`, or localization errors. A pending incomplete
+`ck3st`, scripted GUI, or localization errors. A pending incomplete
 snapshot is shown in the extension status instead of being sent without options.
+
+After changing the game hooks, regenerate the mod, fully exit CK3, stop the old
+companion, and launch CK3 again through the Steam wrapper. Reloading ST or loading
+a save alone does not load new scripted GUI definitions. The pairing token and
+chat binding survive a companion restart.
+
+```sh
+python3 tools/install_mod.py
+python3 companion/bridge.py stop
+```
 
 Local diagnostics are `.runtime/bridge/companion.log`, `.runtime/mod/ck3st-generated.json`
 (source hashes and game version), and your normal CK3 logs. `.runtime` also holds

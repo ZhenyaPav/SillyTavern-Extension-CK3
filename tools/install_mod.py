@@ -22,10 +22,28 @@ def callback(expression, indent='\t\t\t', key='on_start'):
     return f'{indent}{key} = "[{expression}]"\n'
 
 
+FRAME_FIELDS = {
+    'event': ['key', 'title', 'body', 'opening', 'signature', 'count'],
+    'option': ['key', 'title', 'index', 'text'],
+    'choice': ['key', 'title', 'text'],
+    'heartbeat': [], 'session_loaded': [],
+}
+
+
 def log_frame(kind, fields, indent='\t\t\t', key='on_start'):
-    text = ''.join(callback(f"GetVariableSystem.Set('ck3st_{name}', {value})", indent, key)
-                   for name, value in fields.items())
-    return text + callback(f"ExecuteConsoleCommandsForced('effect info_log = ck3st_export_{kind}')", indent, key)
+    # Pass text as typed data in the very same call that exports it, rather than
+    # relying on later console evaluation of mutable global UI variables.
+    scope = 'GuiScope.SetRoot(GetPlayer.MakeScope)'
+    for name, value in fields.items():
+        scope += f".AddScope('ck3st_{name}', MakeScopeFlag({value}))"
+    return callback(f"GetScriptedGui('ck3st_export_{kind}').Execute({scope}.End)", indent, key)
+
+
+def scripted_guis():
+    return ''.join(f'ck3st_export_{kind} = {{\n scope = character\n'
+                   f' saved_scopes = {{ {" ".join("ck3st_"+field for field in fields)} }}\n'
+                   f' effect = {{ info_log = ck3st_export_{kind} }}\n}}\n'
+                   for kind, fields in FRAME_FIELDS.items())
 
 
 EVENT_KEY = concat('EventWindowData.GetDebugInfo', "'|'", 'EventWindowData.GetTitle')
@@ -42,22 +60,32 @@ def event_template():
     output += log_frame('event', {**fields, 'body': 'EventWindowData.GetDescription',
                                  'opening': 'EventWindowData.GetOpening', 'signature': 'EventWindowData.GetSignature',
                                  'count': 'IntToString(GetDataModelSize(EventWindowData.GetOptions))'})
-    output += '\t\t}\n\t\tfixedgridbox = {\n\t\t\tsize = { 1 1 }\n\t\t\taddcolumn = 1\n\t\t\taddrow = 1\n\t\t\talwaystransparent = yes\n'
-    output += '\t\t\tdatamodel = "[EventWindowData.GetOptions]"\n\t\t\titem = {\n\t\t\t\twidget = {\n\t\t\t\t\tsize = { 1 1 }\n\t\t\t\t\talwaystransparent = yes\n\t\t\t\t\tstate = {\n\t\t\t\t\t\tname = ck3st_export_option\n'
+    output += '\t\t}\n\t}\n}\n'
+    return output
+
+
+def option_capture(indent):
+    # Capture on the game's own option widgets. A hidden, clipped model does not
+    # reliably instantiate every item. Sibling shortcut widgets may repeat a frame;
+    # the shared cache and companion deduplicate those without dropping equal labels.
+    output = indent + 'state = {\n'
+    inner = indent + '\t'
+    output += inner + 'name = ck3st_export_option\n'
     index = 'IntToString(PdxGuiWidget.GetIndexInDataModel)'
     seen_option = concat("'ck3st_seen_option_'", EVENT_KEY, "'|'", index)
     option_signature = concat(SIGNATURE, "'|'", 'EventOption.GetText')
-    output += '\t\t\t\t\t\ttrigger_on_create = yes\n'
-    output += f'\t\t\t\t\t\ttrigger_when = "[Not(GetVariableSystem.HasValue({seen_option}, {option_signature}))]"\n'
-    output += callback(f'GetVariableSystem.Set({seen_option}, {option_signature})', '\t'*6)
-    output += log_frame('option', {**fields, 'index': index, 'text': 'EventOption.GetText'}, '\t'*6)
-    output += '\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t}\n}\n'
+    output += inner + 'trigger_on_create = yes\n'
+    output += f'{inner}trigger_when = "[Not(GetVariableSystem.HasValue({seen_option}, {option_signature}))]"\n'
+    output += callback(f'GetVariableSystem.Set({seen_option}, {option_signature})', inner)
+    output += log_frame('option', {'key': EVENT_KEY, 'title': 'EventWindowData.GetTitle',
+                                  'index': index, 'text': 'EventOption.GetText'}, inner)
+    output += indent + '}\n'
     return output
 
 
 def session_widget():
     result = 'widget = {\n\tname = "ck3st_session_monitor"\n\tsize = { 0 0 }\n\talwaystransparent = yes\n'
-    result += '\tstate = {\n\t\tname = ck3st_world_loaded\n\t\ttrigger_when = "[GetPlayer.IsValid]"\n'
+    result += '\tstate = {\n\t\tname = ck3st_world_loaded\n\t\ttrigger_on_create = yes\n\t\ttrigger_when = "[GetPlayer.IsValid]"\n'
     result += log_frame('session_loaded', {}, '\t\t') + '\t}\n'
     result += '\tstate = {\n\t\tname = ck3st_date_changed\n'
     result += '\t\ttrigger_when = "[And(GetPlayer.IsValid, Not(GetVariableSystem.HasValue(\'ck3st_last_date\', GetCurrentDate.GetString)))]"\n'
@@ -69,16 +97,10 @@ def session_widget():
 def localization():
     date = '[GetCurrentDate.GetYear].[GetCurrentDate.GetMonthOfYear].[GetCurrentDate.GetDayOfMonth]'
     base = {'date': date, 'player': '[GetPlayer.GetNameNoTooltip]'}
-    fields_by_kind = {
-        'event': ['key', 'title', 'body', 'opening', 'signature', 'count'],
-        'option': ['key', 'title', 'index', 'text'],
-        'choice': ['key', 'title', 'text'],
-        'heartbeat': [], 'session_loaded': [],
-    }
     lines = ['l_english:']
-    for kind, fields in fields_by_kind.items():
+    for kind, fields in FRAME_FIELDS.items():
         content = f'STCK3_V1_BEGIN {kind}\\n'
-        for name, value in {**base, **{f: f"[GetVariableSystem.Get('ck3st_{f}')]" for f in fields}}.items():
+        for name, value in {**base, **{f: f"[SCOPE.GetFlagName('ck3st_{f}')]" for f in fields}}.items():
             content += f'STCK3_V1_FIELD {name}\\n{value}\\n'
         lines.append(f' ck3st_export_{kind}:0 "{content}STCK3_V1_END"')
     # These are script-side hooks; use their documented script scopes, not GUI data contexts.
@@ -98,7 +120,8 @@ def localization():
         if text:
             fields['text'] = text
         content = f'STCK3_V1_BEGIN {kind}\\n' + ''.join(f'STCK3_V1_FIELD {k}\\n{v}\\n' for k, v in fields.items()) + 'STCK3_V1_END'
-        lines.append(f' ck3st_hook_{key}:0 "{content.replace("scope:", "")}"')
+        content = re.sub(r'\[scope:(\w+)\.', lambda m: "[SCOPE.sC('"+m[1]+"').", content)
+        lines.append(f' ck3st_hook_{key}:0 "{content}"')
     lines += [
         ' ck3st_test_decision:0 "Test SillyTavern bridge"',
         ' ck3st_test_decision_desc:0 "Open a harmless test event to check the bridge connection."',
@@ -142,7 +165,7 @@ def build(game, destination):
         shutil.rmtree(destination)
         destination.mkdir()
     manifest = {'game_version': json.loads((game/'launcher/launcher-settings.json').read_text()).get('rawVersion'),
-                'source_sha256': {}, 'capture': 'experimental normal-mode GUI-to-info_log'}
+                'source_sha256': {}, 'capture': 'scripted GUI with explicit text scopes to info_log'}
     sources = [data/'gui/shared/event_windows.gui', *sorted((data/'gui/event_windows').glob('*.gui'))]
     selects = 0
     for source in sources:
@@ -157,7 +180,7 @@ def build(game, destination):
         pattern = r'(?m)^(\s*)onclick = "\[EventOption.Select\]"'
         def patch_choice(match):
             indent = match[1].split('\n')[-1]
-            return log_frame('choice', {'key': EVENT_KEY, 'title': 'EventWindowData.GetTitle',
+            return option_capture(indent) + log_frame('choice', {'key': EVENT_KEY, 'title': 'EventWindowData.GetTitle',
                                         'text': 'EventOption.GetText'}, indent, 'onclick') + indent + 'onclick = "[EventOption.Select]"'
         text, count = re.subn(pattern, patch_choice, text)
         selects += count
@@ -171,6 +194,7 @@ def build(game, destination):
         raise ValueError('Too few option-selection hooks found; game GUI changed')
     authored = {
         'gui/00_ck3st_capture.gui': event_template(),
+        'common/scripted_guis/ck3st_exports.txt': scripted_guis(),
         'gui/ck3st_session.gui': session_widget(),
         'gui/scripted_widgets/ck3st.txt': 'gui/ck3st_session.gui = ck3st_session_monitor\n',
         'common/on_action/ck3st_on_actions.txt': on_actions(),

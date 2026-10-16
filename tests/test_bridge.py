@@ -34,6 +34,22 @@ class Frames(unittest.TestCase):
         self.assertEqual(result['body'], 'First line.\n\n"Second" [line].')
         self.assertEqual(result['title'], 'Un invité')
 
+    def test_real_engine_source_locations_and_console_echo(self):
+        for location in ('effect console command line: 1',
+                         'common/decisions/ck3st_test.txt line: 8 (ck3st_test_decision:effect)',
+                         'common/on_action/ck3st_on_actions.txt line: 34 (ck3st_war_started:effect)'):
+            with self.subTest(location=location):
+                parser = bridge.FrameParser()
+                self.assertIsNone(parser.feed('[13:17:39][I][console.cpp:205]: Running console command: effect info_log = ck3st_export_event'))
+                data = packet('event', key='ck3st_test.1', title='A messenger arrives',
+                              body='A messenger bows.\n\n"My liege."', count='2')
+                lines = data.splitlines()
+                lines[0] = f'[13:17:39][I][jomini_effect_impl.cpp:450]: file: {location}: '+lines[0]
+                frames = [frame for line in lines if (frame := parser.feed(line))]
+                self.assertEqual(len(frames), 1)
+                self.assertEqual(frames[0]['title'], 'A messenger arrives')
+                self.assertEqual(frames[0]['body'], 'A messenger bows.\n\n"My liege."')
+
     def test_interrupted_and_oversized_frames_resynchronize(self):
         parser = bridge.FrameParser()
         parser.feed('STCK3_V1_BEGIN event')
@@ -123,6 +139,13 @@ class Assembly(unittest.TestCase):
 
     def test_no_clipboard_or_ui_markup_in_message_fields(self):
         self.assertEqual(bridge.plain('#bold The @gold_icon!King#!\n\n[Label|E]'), 'The King\n\nLabel')
+
+    def test_resolved_engine_links_keep_names_and_punctuation(self):
+        text = ('My \x15ONCLICK:CHARACTER,57785 \x15TOOLTIP:CHARACTER,57785 '
+                '\x15L Governor\x15!\x15!\x15! found a '
+                '\x15TOOLTIP:SECRET_TYPE,secret_lover \x15L; Lover Secret\x15!\x15!.\n\n'
+                '\x16warning_icon!\x15weak (A warning)\x15!')
+        self.assertEqual(bridge.plain(text), 'My Governor found a Lover Secret.\n\n(A warning)')
 
 
 if __name__ == '__main__':
