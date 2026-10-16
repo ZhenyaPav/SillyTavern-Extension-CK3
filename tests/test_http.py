@@ -1,7 +1,9 @@
 import json
+import os
 from pathlib import Path
 import socket
 import signal
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -85,6 +87,27 @@ class HttpAndLauncher(unittest.TestCase):
         self.assertEqual(json.loads(result.stdout), [str(self.root), args])
         with self.call('/events?after=0') as response:
             self.assertEqual([e['kind'] for e in json.load(response)['events']], ['game_opened', 'game_closed'])
+
+    def test_actual_shell_wrapper_preserves_pwd_with_nonexecutable_bash_launcher(self):
+        # Redirect only the bridge's python3 invocation to the isolated test server.
+        shim_dir = self.root/'bin'
+        shim_dir.mkdir()
+        shim = shim_dir/'python3'
+        shim.write_text('#!/bin/sh\nshift\nexec '+shlex.join(self.command)+' "$@"\n')
+        shim.chmod(0o755)
+        game_dir = self.root/'game directory with spaces'
+        game_dir.mkdir()
+        launcher = game_dir/'launcher.sh'
+        launcher.write_text('#!/bin/bash\n[[ -r ./marker ]] || exit 9\nexec "$@"\n')
+        launcher.chmod(0o644)
+        (game_dir/'marker').touch()
+        code = 'import json,os,sys; print(json.dumps([os.getcwd(),os.environ["PWD"],sys.argv[1:]])); sys.exit(7)'
+        args = ['with spaces', "an'apostrophe", 'literal$(not-a-command)']
+        result = subprocess.run(['sh', str(ROOT/'launch-mod.sh'), 'bash', './launcher.sh', sys.executable, '-c', code, *args],
+            cwd=game_dir, env={**os.environ, 'PATH': str(shim_dir)+os.pathsep+os.environ['PATH'], 'PWD': str(game_dir)},
+            text=True, capture_output=True, timeout=10)
+        self.assertEqual(result.returncode, 7, result.stderr)
+        self.assertEqual(json.loads(result.stdout), [str(game_dir), str(game_dir), args])
 
     def test_termination_signal_reaches_launched_process(self):
         code = 'import time; print("ready",flush=True); time.sleep(30)'

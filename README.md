@@ -63,7 +63,7 @@ If companion startup fails, the game still launches and the wrapper reports the 
 For this workspace, including your existing wrapper:
 
 ```sh
-sh /home/zhenyapav/Projects/ck3-mods/SillyTavern-Extension-CK3/launch-mod.sh ./cream.sh %command%
+sh /home/zhenyapav/Projects/ck3-mods/SillyTavern-Extension-CK3/launch-mod.sh bash ./cream.sh %command%
 ```
 
 Without that wrapper:
@@ -71,6 +71,11 @@ Without that wrapper:
 ```sh
 sh /home/zhenyapav/Projects/ck3-mods/SillyTavern-Extension-CK3/launch-mod.sh %command%
 ```
+
+`cream.sh` is a Bash script and does not need executable permissions when invoked
+through `bash`. Passing a non-executable `./cream.sh` directly will fail with
+`Permission denied`. The bridge does not change the game's directory or the
+inherited `PWD`; its own path lookup runs in a subshell.
 
 These commands work unchanged from Bash and Fish; Steam itself substitutes
 `%command%`. The bridge starts its companion automatically, launches the supplied
