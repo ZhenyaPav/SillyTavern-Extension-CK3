@@ -5,11 +5,11 @@ records, a local Python companion reads them, and a SillyTavern UI extension add
 ordinary **user messages** to a bound chat. The ST server can run on another host.
 No ST server plugin, OCR, clipboard monitoring, or AI game-control tools are used.
 
-**Version 0.1 is an experimental test build.** The companion and frontend are
+**Version 0.2 is an experimental build.** The companion and frontend are
 independently testable. Game-side capture passes event text as explicit string
 scopes to scripted GUI effects that write fixed `info_log` localization records.
-It uses no console commands. The original console-based export ran in-game but
-produced empty event fields; the corrected scope-based handoff needs live verification.
+It uses no console commands. The scope-based handoff has been confirmed in-game
+with the test event; broader event-surface coverage still needs testing.
 Start with a separate single-player test save;
 Ironman/multiplayer support and achievement compatibility are not established.
 
@@ -93,18 +93,18 @@ an existing companion rather than starting duplicate listeners.
 ```text
 A messenger arrives
 
-19.03.1081
+*19.03.1081*
 
 A messenger bows before you...
 
-Response options:
+*Response options:*
 Welcome. Let us begin.
 You may leave now.
 ```
 
 ```text
-Alex chose: Welcome. Let us begin.
-19.03.1081
+*Alex chose: Welcome. Let us begin.*
+*19.03.1081*
 ```
 
 `Alex` comes from the active ST persona (`{{user}}`), not the CK3 character name.
@@ -112,6 +112,24 @@ Launch/close and loaded-character messages are short prose. Main-menu launch has
 no game date or character yet; those values are reported only after the mod exports
 them. Closure uses the last observed in-game date. Internal framing, event IDs,
 sequence numbers, and deduplication metadata never enter message text.
+
+**Extensions → CK3 Bridge → Message wording** lets you edit every bridge-authored
+chat line: opened/closed/loaded/changed-character messages, choice narration, date
+lines, the response-options heading, and individual birth/death/marriage/divorce/war
+messages. Defaults wrap these lines in asterisks. Event titles, prose, openings,
+signatures, and option labels come directly from CK3 and are kept as game text.
+
+Templates support `{{user}}` (ST persona), `{{player}}` (CK3 player), `{{date}}`
+(DD.MM.YYYY), `{{subject}}` / `{{other}}` (people in a milestone), and `{{text}}`
+(selected option or legacy milestone text). Substitution runs once; template-like
+text inside an event or character name is never evaluated. Empty narration hides
+that message and does not trigger an AI reply. An empty date or options heading
+hides only that line. **Reset message wording** restores the defaults. Wording
+is saved in ST extension settings, separately from browser-local pairing details.
+
+Choosing the only option in an event sends no separate choice message and starts
+no additional AI reply. The event itself, including its option, is still sent.
+Choices from events with multiple options remain visible.
 
 The extension pauses while another chat is open, while an AI reply is generating,
 or while your input has an unsent draft/attachment. It does not replace your draft,
@@ -142,6 +160,11 @@ deaths, marriages/divorces involving the player, the player's children, and wars
 where the player is the principal attacker/defender (start, victory, white peace).
 This first build does not claim to capture every toast, alert, battle result,
 activity-log entry, hidden AI event, or custom total-conversion interface.
+
+Semantic event-type checkboxes are feasible without new capture hooks or a server
+plugin. The assessment and proposed category mapping are in
+[docs/event-filtering.md](docs/event-filtering.md); this release keeps the existing
+session/milestone switches and does not yet add category checkboxes.
 
 To test in normal mode:
 

@@ -108,6 +108,26 @@ class Assembly(unittest.TestCase):
         self.assertEqual([e['kind'] for e in events], ['event', 'choice'])
         self.assertEqual(events[0]['options'], ['Same label', 'Same label'])
         self.assertEqual(events[1]['date'], '1081.3.20')
+        self.assertEqual(events[1]['optionCount'], 2)
+
+    def test_single_option_choice_is_suppressed_even_when_it_arrives_first_or_repeats(self):
+        choice = {'kind': 'choice', 'key': 'test.1', 'title': 'Court', 'text': 'Understood'}
+        self.store.accept(choice)
+        self.store.accept({**self.header, 'count': '1'})
+        self.store.accept(self.option(0, 'Understood'))
+        self.assertEqual([e['kind'] for e in self.store.events(0, 50)], ['event'])
+        self.store.frames_seen.clear()
+        self.store.accept(choice)
+        self.assertEqual([e['kind'] for e in self.store.events(0, 50)], ['event'])
+        self.assertEqual(self.store.pending, {})
+
+    def test_milestone_participants_and_type_survive_without_protocol_text_in_prose(self):
+        self.store.accept({'kind': 'milestone', 'milestoneType': 'marriage',
+                           'subject': '#bold King#!', 'other': 'Queen', 'text': 'King married Queen.'})
+        event = self.store.events(0, 50)[0]
+        self.assertEqual(event['milestoneType'], 'marriage')
+        self.assertEqual(event['subject'], 'King')
+        self.assertEqual(event['other'], 'Queen')
 
     def test_replayed_gui_snapshot_deduplicates(self):
         for _ in range(2):

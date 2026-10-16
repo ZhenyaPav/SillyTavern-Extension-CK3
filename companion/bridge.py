@@ -183,7 +183,8 @@ class Store:
                 self.emit(kind, **self.context)
                 return
             if kind == 'milestone':
-                self.emit(kind, **self.context, text=plain(frame.get('text', '')))
+                self.emit(kind, **self.context, **{k: plain(frame.get(k, ''))
+                          for k in ('text', 'milestoneType', 'subject', 'other')})
                 return
             if kind not in ('event', 'option', 'choice'):
                 logging.warning('Unknown frame kind: %s', kind)
@@ -230,19 +231,21 @@ class Store:
             if self.recent.get(fingerprint, 0) + 2 < now:
                 self.emit('event', **event)
                 self.recent[fingerprint] = now
-            self.emitted[key] = now
+            self.emitted[key] = {'at': now, 'optionCount': pending['expected']}
             pending.pop('header', None)
         if key in self.emitted and pending['choices']:
             for choice in pending['choices']:
+                if self.emitted[key]['optionCount'] == 1:
+                    continue  # An acknowledgement is already represented by its event.
                 fingerprint = key + json.dumps(choice, sort_keys=True)
                 now = time.monotonic()
                 if self.recent.get(fingerprint, 0) + 2 < now:
-                    self.emit('choice', **choice)
+                    self.emit('choice', **choice, optionCount=self.emitted[key]['optionCount'])
                     self.recent[fingerprint] = now
             self.pending.pop(key, None)
         now = time.monotonic()
         self.recent = {k: v for k, v in self.recent.items() if now-v < 10}
-        self.emitted = {k: v for k, v in self.emitted.items() if now-v < 86400}
+        self.emitted = {k: v for k, v in self.emitted.items() if now-v['at'] < 86400}
 
 
 class Tail:

@@ -1,5 +1,5 @@
 import { isGenerating } from '../../../../script.js';
-import { appendEvent, chatTarget, loopbackUrl, persistSnapshot } from './bridge-core.js';
+import { appendEvent, chatTarget, loopbackUrl, MESSAGE_TEMPLATES, persistSnapshot } from './bridge-core.js';
 
 const KEY = 'ck3Bridge';
 const LOCAL_KEY = 'CK3BridgeLocalV1';
@@ -94,7 +94,7 @@ async function poll() {
                 || (event.kind === 'milestone' && !config().milestones);
             if (!skip) {
                 const context = ctx();
-                const added = await appendEvent({ ...context, saveChat: () => persistSnapshot(context) }, event, state.feedId, state.target, ctx);
+                const added = await appendEvent({ ...context, saveChat: () => persistSnapshot(context) }, event, state.feedId, state.target, ctx, config().templates);
                 needReply ||= added;
             }
             // Read latest state to avoid undoing a concurrent Unbind or settings edit.
@@ -134,6 +134,15 @@ export function init() {
           <label class="checkbox_label"><input id="ck3st_reply" type="checkbox"> Automatically generate an AI reply</label>
           <label class="checkbox_label"><input id="ck3st_lifecycle" type="checkbox"> Game/session messages</label>
           <label class="checkbox_label"><input id="ck3st_milestones" type="checkbox"> Major life and war changes</label>
+          <details>
+            <summary>Message wording</summary>
+            <small>Edit the bridge's narration and labels. Game event prose and response options stay as written by CK3.
+              Placeholders: {{user}} = ST persona, {{player}} = CK3 player, {{date}} = game date,
+              {{subject}} / {{other}} = people in a life or war message, {{text}} = selected option or older milestone text.
+              Empty narration hides that message; an empty date or heading hides just that line.</small>
+            <div id="ck3st_templates"></div>
+            <button id="ck3st_reset_templates" class="menu_button" type="button">Reset message wording</button>
+          </details>
           <label for="ck3st_url">Local companion</label>
           <input id="ck3st_url" class="text_pole" placeholder="http://127.0.0.1:17653" autocomplete="off">
           <label for="ck3st_token">Pairing token (stored only in this browser)</label>
@@ -152,6 +161,28 @@ export function init() {
     const state = local();
     document.getElementById('ck3st_url').value = state.url || 'http://127.0.0.1:17653';
     document.getElementById('ck3st_token').value = state.token || '';
+    const templateInputs = new Map();
+    for (const [key, definition] of Object.entries(MESSAGE_TEMPLATES)) {
+        const label = document.createElement('label');
+        label.htmlFor = `ck3st_template_${key}`;
+        label.textContent = definition.label;
+        const input = document.createElement('textarea');
+        input.id = label.htmlFor;
+        input.className = 'text_pole';
+        input.rows = 2;
+        input.value = typeof config().templates?.[key] === 'string' ? config().templates[key] : definition.text;
+        input.addEventListener('input', () => {
+            (config().templates ??= {})[key] = input.value;
+            ctx().saveSettingsDebounced();
+        });
+        templateInputs.set(key, input);
+        document.getElementById('ck3st_templates').append(label, input);
+    }
+    document.getElementById('ck3st_reset_templates').addEventListener('click', () => {
+        config().templates = {};
+        for (const [key, input] of templateInputs) input.value = MESSAGE_TEMPLATES[key].text;
+        ctx().saveSettingsDebounced();
+    });
     for (const [id, key] of [['enabled', 'enabled'], ['reply', 'autoReply'], ['lifecycle', 'lifecycle'], ['milestones', 'milestones']]) {
         const input = document.getElementById(`ck3st_${id}`);
         input.checked = config()[key];

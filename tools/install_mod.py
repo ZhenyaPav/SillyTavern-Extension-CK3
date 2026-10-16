@@ -119,6 +119,16 @@ def localization():
         fields = {'date': date, 'player': player}
         if text:
             fields['text'] = text
+            # Keep the original prose for older frontends, and expose people and
+            # message type so current frontends can use editable narration.
+            subject, other = '[ROOT.Char.GetNameNoTooltip]', ''
+            if key in ('marriage', 'divorce'):
+                other = '[scope:spouse.GetNameNoTooltip]'
+            elif key.startswith('war_'):
+                subject, other = '[scope:attacker.GetNameNoTooltip]', '[scope:defender.GetNameNoTooltip]'
+                if key == 'war_defender_won':
+                    subject, other = other, subject
+            fields.update(milestoneType=key, subject=subject, other=other)
         content = f'STCK3_V1_BEGIN {kind}\\n' + ''.join(f'STCK3_V1_FIELD {k}\\n{v}\\n' for k, v in fields.items()) + 'STCK3_V1_END'
         content = re.sub(r'\[scope:(\w+)\.', lambda m: "[SCOPE.sC('"+m[1]+"').", content)
         lines.append(f' ck3st_hook_{key}:0 "{content}"')

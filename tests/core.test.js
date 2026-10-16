@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { appendEvent, chatTarget, formatEvent, loopbackUrl, persistSnapshot } from '../bridge-core.js';
+import { appendEvent, chatTarget, formatEvent, loopbackUrl, MESSAGE_TEMPLATES, persistSnapshot } from '../bridge-core.js';
 
 function context() {
     return {
@@ -13,9 +13,33 @@ function context() {
 test('RP messages contain only prose and requested date/options, never transport data', () => {
     const message = formatEvent({ kind: 'event', seq: 3, key: 'secret.1', date: '873.2.19',
         title: 'A visitor', body: '/send {{literal}}', options: ['Welcome.', 'Leave.'] }, 'Alex');
-    assert.equal(message, 'A visitor\n\n19.02.873\n\n/send {{literal}}\n\nResponse options:\nWelcome.\nLeave.');
+    assert.equal(message, 'A visitor\n\n*19.02.873*\n\n/send {{literal}}\n\n*Response options:*\nWelcome.\nLeave.');
     assert.equal(formatEvent({ kind: 'choice', date: '1081.3.19', text: 'Welcome.' }, 'Alex'),
-        'Alex chose: Welcome.\n19.03.1081');
+        '*Alex chose: Welcome.*\n*19.03.1081*');
+});
+
+test('editable narration covers lifecycle, choices, dates, labels, and structured milestones', () => {
+    const templates = { game_opened: '{{user}} returns.', date: 'On {{date}}', options_header: 'Choose:',
+        session_loaded: '{{user}} plays {{player}}', marriage: '{{subject}} & {{other}} wed.' };
+    assert.equal(formatEvent({ kind: 'game_opened' }, 'Alex', templates), 'Alex returns.');
+    assert.equal(formatEvent({ kind: 'session_loaded', player: 'King', date: '873.2.19' }, 'Alex', templates), 'Alex plays King\nOn 19.02.873');
+    assert.equal(formatEvent({ kind: 'event', body: '{{user}} stands.', options: ['{{text}}'], date: '873.2.19' }, 'Alex', templates),
+        'On 19.02.873\n\n{{user}} stands.\n\nChoose:\n{{text}}');
+    assert.equal(formatEvent({ kind: 'milestone', milestoneType: 'marriage', subject: '{{user}}', other: 'Queen', text: 'Old wording' }, 'Alex', templates),
+        '{{user}} & Queen wed.');
+    assert.equal(formatEvent({ kind: 'milestone', text: 'An older notification.' }, 'Alex'), '*An older notification.*');
+    for (const [kind, definition] of Object.entries(MESSAGE_TEMPLATES)) assert.ok(definition.text.startsWith('*') && definition.text.endsWith('*'), kind);
+});
+
+test('empty narration and single-option acknowledgements do not create a message or save', async () => {
+    const c = context();
+    let saves = 0;
+    c.saveChat = async () => { saves++; };
+    assert.equal(formatEvent({ kind: 'game_closed', date: '873.2.19' }, 'Alex', { game_closed: '' }), '');
+    assert.equal(formatEvent({ kind: 'event', title: 'Event', options: ['OK'] }, 'Alex', { options_header: '' }), 'Event\n\nOK');
+    assert.equal(await appendEvent(c, { kind: 'choice', text: 'OK', optionCount: 1 }, 'feed', chatTarget(c)), false);
+    assert.equal(c.chat.length, 0);
+    assert.equal(saves, 0);
 });
 
 test('durable message metadata prevents duplicate imports after a cursor-save failure', async () => {

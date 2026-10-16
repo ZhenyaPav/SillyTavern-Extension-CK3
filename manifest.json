@@ -6,7 +6,7 @@
     "dependencies": [],
     "js": "index.js",
     "author": "ZhenyaPav",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "minimum_client_version": "1.19.0",
     "auto_update": false,
     "homepage": "https://github.com/ZhenyaPav/SillyTavern-Extension-CK3",

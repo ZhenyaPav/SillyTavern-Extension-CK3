@@ -123,6 +123,9 @@ try {
     contextId = (await command('browsingContext.create', { type: 'tab' })).context;
     await command('browsingContext.navigate', { context: contextId, url: origin+'/__ck3_bridge_smoke__', wait: 'complete' });
     await until(() => evaluate('Boolean(document.getElementById("ck3st_connect"))'), 'extension initialization');
+    assert.equal(await evaluate('document.getElementById("ck3st_template_game_opened").value'), '*{{user}} opened Crusader Kings III.*');
+    await evaluate(`document.getElementById('ck3st_template_options_header').value='*Available choices:*'; document.getElementById('ck3st_template_options_header').dispatchEvent(new Event('input')); true`);
+    assert.equal(await evaluate('context.extensionSettings.ck3Bridge.templates.options_header'), '*Available choices:*');
     await evaluate(`document.getElementById('ck3st_url').value='http://127.0.0.1:${port}'; document.getElementById('ck3st_token').value=${JSON.stringify(token)}; document.getElementById('ck3st_connect').click(); true`);
     await until(() => evaluate('document.getElementById("ck3st_status").textContent.includes("Connected")'), 'HTTPS Firefox to loopback CORS');
     await evaluate("document.getElementById('ck3st_bind').click(); true");
@@ -149,7 +152,7 @@ try {
     const frame = '[13:17:39][I][jomini_effect_impl.cpp:450]: file: common/on_action/ck3st_on_actions.txt line: 34 (ck3st_birth:effect): STCK3_V1_BEGIN milestone\nSTCK3_V1_FIELD date\n1081.3.20\nSTCK3_V1_FIELD text\nA child was born.\nSTCK3_V1_END\n';
     await appendFile(join(directory, 'logs/game.log'), frame);
     await until(() => evaluate('context.chat.length===3'), 'real log-to-browser delivery');
-    assert.equal(await evaluate('context.chat[2].mes'), '20.03.1081\nA child was born.');
+    assert.equal(await evaluate('context.chat[2].mes'), '*20.03.1081*\n*A child was born.*');
     const location = '[13:17:54][I][jomini_effect_impl.cpp:450]: file: common/scripted_guis/ck3st_exports.txt line: 4 (ck3st_export_event:effect): ';
     const packet = (kind, fields) => location + `STCK3_V1_BEGIN ${kind}\n` + Object.entries(fields).map(([key, value]) => `STCK3_V1_FIELD ${key}\n${value}\n`).join('') + 'STCK3_V1_END\n';
     const event = { key: 'ck3st_test.1', title: 'A messenger arrives', date: '1081.3.20' };
@@ -158,9 +161,28 @@ try {
     assert.equal(await evaluate('context.chat.length'), 3, 'partial event must wait for every option');
     await appendFile(join(directory, 'logs/game.log'), packet('option', { ...event, index: '0', text: 'Welcome. Let us begin.' }));
     await until(() => evaluate('context.chat.length===4 && window.generations===4'), 'complete game event delivery');
-    assert.equal(await evaluate('context.chat[3].mes'), 'A messenger arrives\n\n20.03.1081\n\nA messenger bows.\n\n"My liege."\n\nResponse options:\nWelcome. Let us begin.\nYou may leave now.');
-    assert.equal(saved, 4);
-    console.log('PASS: Firefox HTTPS-to-loopback, pairing/CORS, draft preservation, auto reply, replay, chat switching, failed-save retry, and log-to-chat delivery.');
+    assert.equal(await evaluate('context.chat[3].mes'), 'A messenger arrives\n\n*20.03.1081*\n\nA messenger bows.\n\n"My liege."\n\n*Available choices:*\nWelcome. Let us begin.\nYou may leave now.');
+    const acknowledgement = { key: 'test.2', title: 'News from court', date: '1081.3.21' };
+    await appendFile(join(directory, 'logs/game.log'), packet('event', { ...acknowledgement, body: 'Important news.', count: '1' }) + packet('option', { ...acknowledgement, index: '0', text: 'Understood.' }));
+    await until(() => evaluate('context.chat.length===5 && window.generations===5'), 'single-option event delivery');
+    await appendFile(join(directory, 'logs/game.log'), packet('choice', { ...acknowledgement, text: 'Understood.' }));
+    await delay(1800);
+    assert.equal(await evaluate('context.chat.length'), 5, 'acknowledgement must not add a chat message');
+    assert.equal(await evaluate('window.generations'), 5, 'acknowledgement must not trigger an AI reply');
+    await evaluate(`document.getElementById('ck3st_template_marriage').value='*Wedding: {{subject}} + {{other}}*'; document.getElementById('ck3st_template_marriage').dispatchEvent(new Event('input')); true`);
+    await appendFile(join(directory, 'logs/game.log'), packet('milestone', { date: '1081.3.21', milestoneType: 'marriage', subject: 'King', other: 'Queen', text: 'Old wording.' }));
+    await until(() => evaluate('context.chat.length===6 && window.generations===6'), 'custom milestone narration');
+    assert.equal(await evaluate('context.chat[5].mes'), '*21.03.1081*\n*Wedding: King + Queen*');
+    await evaluate(`document.getElementById('ck3st_template_game_opened').value=''; document.getElementById('ck3st_template_game_opened').dispatchEvent(new Event('input')); true`);
+    const opened = await fetch(`http://127.0.0.1:${port}/lifecycle`, { method: 'POST', headers: { 'X-CK3-Token': token }, body: '{"action":"opened"}' });
+    assert.equal(opened.status, 200);
+    await delay(1800);
+    assert.equal(await evaluate('context.chat.length'), 6, 'empty narration must suppress delivery');
+    assert.equal(await evaluate('window.generations'), 6, 'empty narration must not generate');
+    await evaluate(`document.getElementById('ck3st_reset_templates').click(); true`);
+    assert.equal(await evaluate('document.getElementById("ck3st_template_options_header").value'), '*Response options:*');
+    assert.equal(saved, 6);
+    console.log('PASS: Firefox pairing/CORS, queueing, retries, editable narration, reset, full event delivery, and single-option choice/reply suppression.');
 } finally {
     try { socket?.close(); } catch { /* closed */ }
     firefox?.kill('SIGTERM');
