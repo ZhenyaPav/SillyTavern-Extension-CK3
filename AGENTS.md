@@ -15,8 +15,11 @@ AI game-control tools, use OCR, or change the clipboard without a new user reque
 - Keep protocol/queue metadata outside chat text. Preserve user drafts and pause
   delivery when the bound chat is not open or generation is running.
 - Missing external tools belong in Docker; do not install host dependencies.
-- Run `python3 -m unittest discover -s tests -v`, `node tests/core.test.js`, and
-  `sh -n launch-mod.sh`. Use `tests/firefox-smoke.mjs` for browser changes when the
+- Keep category definitions/rules in `event-categories.json`; regenerate the local
+  event index after changing rules. Preserve unknown events in Other by default.
+- Run `python3 -m unittest discover -s tests -v`, `node tests/core.test.js`,
+  `node tests/categories.test.js`, and `sh -n launch-mod.sh`.
+  Use `tests/firefox-smoke.mjs` for browser changes when the
   local Firefox and existing ST dependency checkout are available.
 - Generate and statically validate the mod after game-hook changes. Distinguish
   static/browser tests from live CK3 evidence; never claim unperformed game tests.

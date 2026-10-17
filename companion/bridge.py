@@ -22,6 +22,8 @@ import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from companion.category_rules import Classifier, DEFAULT_INDEX, extract_event_id
 DEFAULT_LOGS = Path.home() / '.local/share/Paradox Interactive/Crusader Kings III/logs'
 DEFAULT_STATE = ROOT / '.runtime/bridge'
 DEFAULT_ORIGIN = 'https://nova-st.pve.realm.bz'
@@ -72,7 +74,8 @@ class FrameParser:
 
 
 class Store:
-    def __init__(self, directory):
+    def __init__(self, directory, category_index=DEFAULT_INDEX):
+        self.classifier = Classifier(category_index)
         directory.mkdir(parents=True, exist_ok=True, mode=0o700)
         directory.chmod(0o700)
         self.lock = threading.RLock()
@@ -134,6 +137,7 @@ class Store:
                     'gameRunning': self.game_running, 'context': self.context,
                     'lastFrameAt': self.last_frame, 'framesReceived': self.frame_count,
                     'frameCounts': dict(self.frame_counts),
+                    'categoryFiltering': 1, 'categoryIndexLoaded': self.classifier.index_loaded,
                     'pendingEvents': len(self.pending),
                     'incompleteEvents': sum(time.monotonic()-v['created'] > 3 for v in self.pending.values())}
 
@@ -226,12 +230,16 @@ class Store:
         if header and all(i in pending['options'] for i in range(pending.get('expected', 257))):
             event = {k: plain(header.get(k, '')) for k in ('date', 'player', 'title', 'body', 'opening', 'signature')}
             event['options'] = [pending['options'][i] for i in range(pending['expected'])]
+            event['eventId'] = extract_event_id(header.get('key', ''))
+            event['category'] = self.classifier.classify(event['eventId'])
+            event['eventKey'] = key
             fingerprint = hashlib.sha256(json.dumps(event, sort_keys=True).encode()).hexdigest()
             now = time.monotonic()
             if self.recent.get(fingerprint, 0) + 2 < now:
                 self.emit('event', **event)
                 self.recent[fingerprint] = now
-            self.emitted[key] = {'at': now, 'optionCount': pending['expected']}
+            self.emitted[key] = {'at': now, 'optionCount': pending['expected'],
+                                 **{k: event[k] for k in ('eventId', 'category', 'eventKey')}}
             pending.pop('header', None)
         if key in self.emitted and pending['choices']:
             for choice in pending['choices']:
@@ -240,7 +248,8 @@ class Store:
                 fingerprint = key + json.dumps(choice, sort_keys=True)
                 now = time.monotonic()
                 if self.recent.get(fingerprint, 0) + 2 < now:
-                    self.emit('choice', **choice, optionCount=self.emitted[key]['optionCount'])
+                    self.emit('choice', **choice, **{k: self.emitted[key][k]
+                              for k in ('optionCount', 'eventId', 'category', 'eventKey')})
                     self.recent[fingerprint] = now
             self.pending.pop(key, None)
         now = time.monotonic()
@@ -278,7 +287,7 @@ class Tail:
 
 
 def serve(args):
-    store = Store(args.state_dir)
+    store = Store(args.state_dir, args.category_index)
     tails = [Tail(args.logs / name) for name in ('game.log', 'debug.log', 'error.log')]
 
     class Handler(BaseHTTPRequestHandler):
@@ -399,10 +408,10 @@ def ensure(args):
         return
     except (OSError, urllib.error.URLError):
         pass
-    Store(args.state_dir).db.close()
+    Store(args.state_dir, args.category_index).db.close()
     with (args.state_dir / 'companion.log').open('a') as output:
         command = [sys.executable, str(Path(__file__).resolve()), '--state-dir', str(args.state_dir),
-                   '--logs', str(args.logs), '--port', str(args.port)]
+                   '--logs', str(args.logs), '--port', str(args.port), '--category-index', str(args.category_index)]
         for origin in args.origin:
             command += ['--origin', origin]
         subprocess.Popen(command + ['serve'], stdin=subprocess.DEVNULL, stdout=output,
@@ -470,6 +479,7 @@ def main():
     parser.add_argument('--logs', type=Path, default=DEFAULT_LOGS)
     parser.add_argument('--port', type=int, default=17653)
     parser.add_argument('--origin', action='append')
+    parser.add_argument('--category-index', type=Path, default=DEFAULT_INDEX)
     subs = parser.add_subparsers(dest='action', required=True)
     for action in ('serve', 'ensure', 'token', 'status', 'test', 'stop'):
         subs.add_parser(action)

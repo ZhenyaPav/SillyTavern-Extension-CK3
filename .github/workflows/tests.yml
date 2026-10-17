@@ -15,4 +15,5 @@ jobs:
           node-version: '22'
       - run: python3 -m unittest discover -s tests -v
       - run: node tests/core.test.js
+      - run: node tests/categories.test.js
       - run: sh -n launch-mod.sh

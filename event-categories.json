@@ -1,0 +1,558 @@
+{
+  "version": 1,
+  "categories": [
+    {
+      "id": "family",
+      "label": "Family & relationships",
+      "description": "Births, childhood, marriage, friends, lovers and rivalries.",
+      "storyFocused": true
+    },
+    {
+      "id": "health",
+      "label": "Health, death & stress",
+      "description": "Illness, treatment, accidents, bereavement and mental breaks.",
+      "storyFocused": true
+    },
+    {
+      "id": "reports",
+      "label": "Routine councillor & secret reports",
+      "description": "Task reports, discovered secrets, nothing found and routine side effects.",
+      "storyFocused": false
+    },
+    {
+      "id": "vassal_routine",
+      "label": "Homage & routine vassal requests",
+      "description": "Homage, routine petitions, pardon and contract correspondence.",
+      "storyFocused": false
+    },
+    {
+      "id": "politics",
+      "label": "Court & realm politics",
+      "description": "Courtiers, appointments, disputes, diplomacy, factions and government.",
+      "storyFocused": true
+    },
+    {
+      "id": "war",
+      "label": "War & combat",
+      "description": "Wars, battles, raids, duels and military developments.",
+      "storyFocused": true
+    },
+    {
+      "id": "scheme_progress",
+      "label": "Scheme developments",
+      "description": "Progress, preparations, opportunities, agent management and reminders.",
+      "storyFocused": false
+    },
+    {
+      "id": "scheme_finales",
+      "label": "Scheme finales & exposure",
+      "description": "Success, failure, discovered plots, exposed perpetrators and major revelations.",
+      "storyFocused": true
+    },
+    {
+      "id": "religion",
+      "label": "Religion",
+      "description": "Faith, clergy, religious decisions and stories.",
+      "storyFocused": true
+    },
+    {
+      "id": "culture",
+      "label": "Culture",
+      "description": "Cultural changes, traditions and language-related events.",
+      "storyFocused": true
+    },
+    {
+      "id": "lifestyle",
+      "label": "Lifestyle & education",
+      "description": "Lifestyle stories, training and adult education.",
+      "storyFocused": true
+    },
+    {
+      "id": "activities",
+      "label": "Activities & celebrations",
+      "description": "Hunts, feasts, tournaments, weddings and coronations.",
+      "storyFocused": true
+    },
+    {
+      "id": "travel",
+      "label": "Travel & adventuring",
+      "description": "Journey encounters, dangers, camps and contracts.",
+      "storyFocused": true
+    },
+    {
+      "id": "artifacts",
+      "label": "Artifacts, books & legends",
+      "description": "Inspirations, artifacts, commissions and legends.",
+      "storyFocused": true
+    },
+    {
+      "id": "other",
+      "label": "Story chains & other events",
+      "description": "Dedicated stories, unclassified events and older records without category data.",
+      "storyFocused": true
+    }
+  ],
+  "eventRules": [
+    {
+      "namespace": "ep3_decisions_event",
+      "numbers": [
+        2001,
+        2002,
+        2010,
+        2011,
+        2080,
+        2090
+      ],
+      "category": "vassal_routine"
+    },
+    {
+      "namespace": "tgp_interaction_event",
+      "numbers": [
+        10,
+        11,
+        12,
+        15,
+        16
+      ],
+      "category": "war"
+    },
+    {
+      "namespace": "scheme_critical_moments",
+      "ranges": [
+        [
+          1001,
+          1999
+        ]
+      ],
+      "category": "scheme_finales"
+    },
+    {
+      "namespace": "vassal_interaction",
+      "numbers": [
+        30
+      ],
+      "category": "vassal_routine"
+    },
+    {
+      "namespace": "char_interaction",
+      "numbers": [
+        240,
+        250,
+        251,
+        252
+      ],
+      "category": "vassal_routine"
+    },
+    {
+      "namespace": "petition_liege",
+      "numbers": [
+        1,
+        9,
+        201,
+        209,
+        501,
+        601
+      ],
+      "category": "vassal_routine"
+    },
+    {
+      "namespace": "spymaster_task",
+      "numbers": [
+        1001,
+        1002,
+        1003,
+        1004,
+        1005,
+        1101
+      ],
+      "category": "scheme_finales"
+    },
+    {
+      "namespace": "char_interaction",
+      "ranges": [
+        [
+          20,
+          50
+        ],
+        [
+          78,
+          90
+        ]
+      ],
+      "category": "family"
+    },
+    {
+      "namespace": "char_interaction",
+      "numbers": [
+        170,
+        171
+      ],
+      "category": "health"
+    }
+  ],
+  "namespaceRules": [
+    {
+      "category": "vassal_routine",
+      "names": [
+        "pay_homage",
+        "pledge_loyalty_to_liege",
+        "pledge_loyalty_to_liege_overdue"
+      ]
+    },
+    {
+      "category": "scheme_finales",
+      "names": [
+        "hostile_scheme_discovery",
+        "blackmail",
+        "secrets",
+        "secret_bastard",
+        "elope",
+        "abduct_outcome",
+        "murder_save",
+        "study_scripture_outcome",
+        "study_confucian_classics_outcome"
+      ],
+      "suffixes": [
+        "_outcome",
+        "_outcome_reworked"
+      ]
+    },
+    {
+      "category": "scheme_progress",
+      "names": [
+        "scheme_critical_moments",
+        "agent_events",
+        "personal_scheme_ongoing",
+        "intrigue_scheme_ongoing",
+        "intrigue_scheme_lifestyle",
+        "diplomatic_scheme_lifestyle",
+        "court_ongoing",
+        "seduce_ongoing",
+        "claim_throne_ongoing",
+        "fabricate_hook_ongoing",
+        "learn_language_ongoing",
+        "steal_back_artifact_ongoing",
+        "steal_herd_ongoing",
+        "study_faith_ongoing"
+      ],
+      "prefixes": [
+        "murder_ongoing",
+        "assassination_ongoing",
+        "befriend_ongoing",
+        "coerce_",
+        "disbelieve_mandala_ongoing"
+      ]
+    },
+    {
+      "category": "reports",
+      "prefixes": [
+        "chancellor_task",
+        "steward_task",
+        "marshal_task",
+        "spymaster_task",
+        "court_chaplain_task",
+        "kurultai_task",
+        "councillor_spouse_"
+      ]
+    },
+    {
+      "category": "family",
+      "names": [
+        "birth",
+        "pregnancy",
+        "adoption",
+        "marriage_effect",
+        "marriage_interaction",
+        "bastard_interaction",
+        "child_personality",
+        "childhood",
+        "childhood_education",
+        "coming_of_age",
+        "spouse",
+        "parent",
+        "sibling",
+        "lover",
+        "friendship",
+        "rivalry",
+        "adultery",
+        "relation_upgrade",
+        "bp1_house_feud",
+        "bp2_hostage_system",
+        "destiny_child",
+        "tgp_child_personality"
+      ],
+      "prefixes": [
+        "bp2_yearly"
+      ]
+    },
+    {
+      "category": "health",
+      "names": [
+        "health",
+        "harm",
+        "death_management",
+        "elder_events",
+        "epidemic_events",
+        "physician_epidemic_events"
+      ],
+      "prefixes": [
+        "stress_"
+      ]
+    },
+    {
+      "category": "war",
+      "names": [
+        "war_event",
+        "combat_event",
+        "raiding",
+        "siege",
+        "single_combat",
+        "call_ally",
+        "great_holy_war",
+        "fp1_tbc",
+        "fp1_jomsvikings",
+        "accolade",
+        "ep2_accolade_events",
+        "learn_commander_trait",
+        "historical_commander_trait",
+        "warhorse"
+      ]
+    },
+    {
+      "category": "culture",
+      "names": [
+        "global_culture",
+        "culture_emergence_events",
+        "culture_notification",
+        "culture_tradition_events",
+        "culture_conversion",
+        "language_events"
+      ]
+    },
+    {
+      "category": "religion",
+      "names": [
+        "secret_faith",
+        "global_religion",
+        "witch",
+        "clerical_chastity_vow",
+        "empire_faith_gate",
+        "mystic_lifestyle",
+        "rite_travel_events",
+        "slavic_rite",
+        "ecumenical_council_summons_events",
+        "ecumenical_council_events",
+        "ecumenical_council_events_josh",
+        "pam_investiture_council_events",
+        "heresy_historical",
+        "heresy_dangerous_rite",
+        "heresy_light",
+        "heresy_pulse"
+      ]
+    },
+    {
+      "category": "lifestyle",
+      "names": [
+        "mentor_student",
+        "chinese_students",
+        "bp2_adult_education",
+        "sell_titles",
+        "subject_extortion",
+        "lifestyle_nicknames",
+        "fp3_scholarship"
+      ],
+      "prefixes": [
+        "diplomacy_",
+        "martial_",
+        "stewardship_",
+        "intrigue_dread",
+        "intrigue_lover",
+        "intrigue_scheming",
+        "intrigue_temptation",
+        "learning_"
+      ]
+    },
+    {
+      "category": "artifacts",
+      "names": [
+        "artifact",
+        "historical_artifacts",
+        "fund_inspiration",
+        "inspiration_system",
+        "commission_epic",
+        "author_book",
+        "legend_events",
+        "legend_spread_events",
+        "story_event_legends",
+        "pam_religious_artifact_events"
+      ]
+    },
+    {
+      "category": "activities",
+      "names": [
+        "ep2_wedding",
+        "ep2_wedding_ewan",
+        "ep3_wedding",
+        "ep2_tournament_events",
+        "board_games",
+        "ach_coronation"
+      ]
+    },
+    {
+      "category": "travel",
+      "names": [
+        "migration_events",
+        "mpo_contract_events",
+        "mpo_migration_travel_events",
+        "journey_events",
+        "destination_events",
+        "internal_affairs",
+        "wanderer_lifestyle_events",
+        "governor_contract_event",
+        "governor_contract_events_tova",
+        "tgp_governor_contract_event",
+        "tgp_east_asia_mandala_task_contract_events",
+        "tgp_natural_disaster_contract_event"
+      ],
+      "prefixes": [
+        "ep3_laamp",
+        "ep3_camp_",
+        "laamp_",
+        "bp3_",
+        "mapmaking",
+        "tgp_travel_"
+      ]
+    },
+    {
+      "category": "politics",
+      "names": [
+        "char_interaction",
+        "vassal_interaction",
+        "council_interaction",
+        "courtier_guest_management",
+        "court_position",
+        "court_position_management_event",
+        "diarchy",
+        "vizierate",
+        "clan",
+        "clan_event",
+        "tribal",
+        "legitimacy_events",
+        "title_event",
+        "faction_demand",
+        "faction_invitation",
+        "petition_liege",
+        "fp2_struggle",
+        "fp3_struggle",
+        "natural_disaster",
+        "mpo_the_great_steppe"
+      ],
+      "prefixes": [
+        "court",
+        "ep3_admin",
+        "ep3_emperor",
+        "ep3_governor",
+        "ep3_eparch",
+        "ep3_landless_admin",
+        "ep3_powerful_families",
+        "tgp_china_career",
+        "tgp_china_ministry",
+        "tgp_japan_career",
+        "tgp_japan_general",
+        "tgp_house_blocs",
+        "tgp_faction",
+        "tgp_dynastic_cycle",
+        "tgp_ceremonial_liege",
+        "tgp_east_asia_mandala",
+        "devaraja",
+        "tribute_mission",
+        "ep3_decisions_event"
+      ]
+    }
+  ],
+  "pathRules": [
+    {
+      "category": "scheme_progress",
+      "prefixes": [
+        "scheme_events/"
+      ]
+    },
+    {
+      "category": "reports",
+      "prefixes": [
+        "councillor_task_events/"
+      ]
+    },
+    {
+      "category": "family",
+      "prefixes": [
+        "relations_events/",
+        "education_and_childhood/"
+      ]
+    },
+    {
+      "category": "health",
+      "prefixes": [
+        "death_events/",
+        "stress_events/"
+      ]
+    },
+    {
+      "category": "politics",
+      "prefixes": [
+        "court_events/",
+        "courtier_guest_management_events/",
+        "diarchy_events/",
+        "government_events/",
+        "factions/",
+        "interaction_events/",
+        "decisions_events/"
+      ]
+    },
+    {
+      "category": "culture",
+      "prefixes": [
+        "culture_events/"
+      ]
+    },
+    {
+      "category": "religion",
+      "prefixes": [
+        "religion_events/",
+        "passive_rite_learning_events/",
+        "dlc/pam/"
+      ]
+    },
+    {
+      "category": "war",
+      "prefixes": [
+        "war_events/"
+      ]
+    },
+    {
+      "category": "lifestyle",
+      "prefixes": [
+        "lifestyles/"
+      ]
+    },
+    {
+      "category": "activities",
+      "prefixes": [
+        "activities/",
+        "dlc/ep2/wedding_events/"
+      ]
+    },
+    {
+      "category": "travel",
+      "prefixes": [
+        "travel_events/"
+      ]
+    },
+    {
+      "category": "artifacts",
+      "prefixes": [
+        "artifacts/"
+      ]
+    }
+  ]
+}

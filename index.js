@@ -1,5 +1,6 @@
 import { isGenerating } from '../../../../script.js';
 import { appendEvent, chatTarget, loopbackUrl, MESSAGE_TEMPLATES, persistSnapshot } from './bridge-core.js';
+import { createCategoryFilters } from './category-filters.js';
 
 const KEY = 'ck3Bridge';
 const LOCAL_KEY = 'CK3BridgeLocalV1';
@@ -10,6 +11,7 @@ let polling = false;
 let timer;
 let activeController;
 let lastStatus;
+let categoryFilters;
 
 function ctx() { return SillyTavern.getContext(); }
 function config() {
@@ -84,15 +86,16 @@ async function poll() {
         if (isGenerating() || hasDraft()) return status('Queued: waiting for generation or your draft/attachment.');
         if (lastStatus.incompleteEvents) status(`Incomplete event snapshots: ${lastStatus.incompleteEvents}. Check game export.`);
         else if (lastStatus.gameRunning && !lastStatus.framesReceived) status('Game running; waiting for the mod’s first log frame.');
+        else if (!lastStatus.categoryFiltering) status('Connected. Restart the updated companion to enable category filtering.');
+        else if (!lastStatus.categoryIndexLoaded) status('Connected. Regenerate the local mod for complete category coverage.');
         else status(`Connected · ${lastStatus.framesReceived} game frames · ${lastStatus.context?.date || 'no game date yet'}`);
         const batch = await api(`/events?after=${Number(state.cursor) || 0}`);
         if (batch.feedId !== state.feedId) throw new Error('Companion history changed; bind again');
         let needReply = state.pendingReply === true;
         for (const event of batch.events) {
             if (chatTarget(ctx()) !== state.target || hasDraft() || isGenerating() || !config().enabled) break;
-            const skip = (['game_opened', 'game_closed', 'session_loaded', 'character_changed'].includes(event.kind) && !config().lifecycle)
-                || (event.kind === 'milestone' && !config().milestones);
-            if (!skip) {
+            const allowed = categoryFilters.allows(event, config(), state.decisions);
+            if (allowed) {
                 const context = ctx();
                 const added = await appendEvent({ ...context, saveChat: () => persistSnapshot(context) }, event, state.feedId, state.target, ctx, config().templates);
                 needReply ||= added;
@@ -100,6 +103,8 @@ async function poll() {
             // Read latest state to avoid undoing a concurrent Unbind or settings edit.
             const latest = local();
             if (latest.target !== state.target || latest.feedId !== state.feedId) break;
+            latest.decisions = categoryFilters.remember(latest.decisions, event, allowed);
+            state.decisions = latest.decisions;
             latest.cursor = event.seq;
             latest.pendingReply = needReply;
             saveLocal(latest);
@@ -121,9 +126,13 @@ async function poll() {
     }
 }
 
-export function init() {
+export async function init() {
     if (initialized) return;
     initialized = true;
+    const response = await fetch(new URL('./event-categories.json', import.meta.url));
+    if (!response.ok) throw new Error('CK3 Bridge category settings could not load. Update the extension and reload ST.');
+    const { categories } = await response.json();
+    categoryFilters = createCategoryFilters(categories);
     const panel = document.createElement('div');
     panel.className = 'extension_container';
     panel.innerHTML = `
@@ -134,6 +143,18 @@ export function init() {
           <label class="checkbox_label"><input id="ck3st_reply" type="checkbox"> Automatically generate an AI reply</label>
           <label class="checkbox_label"><input id="ck3st_lifecycle" type="checkbox"> Game/session messages</label>
           <label class="checkbox_label"><input id="ck3st_milestones" type="checkbox"> Major life and war changes</label>
+          <details id="ck3st_category_panel">
+            <summary>Event categories</summary>
+            <div class="flex-container">
+              <button id="ck3st_categories_all" class="menu_button" type="button">Select all</button>
+              <button id="ck3st_categories_none" class="menu_button" type="button">Clear all</button>
+              <button id="ck3st_categories_story" class="menu_button" type="button">Story-focused</button>
+            </div>
+            <div id="ck3st_categories"></div>
+            <small>Story-focused mutes routine reports, homage/requests and scheme developments.
+              Filters apply to pending events and life/war notices. Choices follow their event.
+              Skipped events are not replayed when re-enabled. Game/session messages use their separate switch.</small>
+          </details>
           <details>
             <summary>Message wording</summary>
             <small>Edit the bridge's narration and labels. Game event prose and response options stay as written by CK3.
@@ -161,6 +182,32 @@ export function init() {
     const state = local();
     document.getElementById('ck3st_url').value = state.url || 'http://127.0.0.1:17653';
     document.getElementById('ck3st_token').value = state.token || '';
+    const categoryInputs = new Map();
+    for (const definition of categories) {
+        const label = document.createElement('label');
+        label.className = 'checkbox_label';
+        label.title = definition.description;
+        const input = document.createElement('input');
+        input.type = 'checkbox';
+        input.id = `ck3st_category_${definition.id}`;
+        input.checked = config().categories?.[definition.id] !== false;
+        input.addEventListener('change', () => {
+            (config().categories ??= {})[definition.id] = input.checked;
+            ctx().saveSettingsDebounced();
+            schedulePoll();
+        });
+        label.append(input, document.createTextNode(' ' + definition.label));
+        document.getElementById('ck3st_categories').append(label);
+        categoryInputs.set(definition.id, input);
+    }
+    for (const preset of ['all', 'none', 'story']) {
+        document.getElementById(`ck3st_categories_${preset}`).addEventListener('click', () => {
+            config().categories = categoryFilters.preset(preset);
+            for (const [id, input] of categoryInputs) input.checked = config().categories[id];
+            ctx().saveSettingsDebounced();
+            schedulePoll();
+        });
+    }
     const templateInputs = new Map();
     for (const [key, definition] of Object.entries(MESSAGE_TEMPLATES)) {
         const label = document.createElement('label');
@@ -214,7 +261,7 @@ export function init() {
         const target = chatTarget(ctx());
         if (!target) throw new Error('Open a saved character or group chat first');
         const health = await api('/health');
-        saveLocal({ ...local(), target, feedId: health.feedId, cursor: health.latest, pendingReply: false });
+        saveLocal({ ...local(), target, feedId: health.feedId, cursor: health.latest, pendingReply: false, decisions: {} });
         status('Bound to this chat. New game messages will arrive here.');
     });
     action('unbind', async () => {
@@ -224,6 +271,7 @@ export function init() {
         activeController?.abort();
         const current = local();
         delete current.target;
+        delete current.decisions;
         current.pendingReply = false;
         saveLocal(current);
         status('Unbound.');

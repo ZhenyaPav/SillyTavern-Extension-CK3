@@ -96,7 +96,8 @@ export async function appendEvent(context, event, feedId, expectedTarget, curren
     const message = {
         name: context.name1 || 'User', is_user: true, is_system: false,
         send_date: new Date().toISOString(), mes: text,
-        extra: { ck3Bridge: { feedId, seq: event.seq, kind: event.kind } },
+        extra: { ck3Bridge: { feedId, seq: event.seq, kind: event.kind,
+            ...(event.eventKey ? { eventKey: event.eventKey, eventId: event.eventId, category: event.category } : {}) } },
     };
     // No slash-command evaluation, template evaluation, attachment consumption, or draft edits.
     if (context.chatMetadata) context.chatMetadata.tainted = true;

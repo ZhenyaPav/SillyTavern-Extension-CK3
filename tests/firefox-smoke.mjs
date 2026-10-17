@@ -106,7 +106,10 @@ try {
             let statusCode = 200;
             if (path === '/__ck3_bridge_smoke__') { body = html; type = 'text/html'; }
             else if (path === '/public/script.js') body = 'export const isGenerating = () => window.busy;';
-            else if ([extensionPath+'index.js', extensionPath+'bridge-core.js'].includes(path)) body = await readFile(join(root, path.split('/').pop()), 'utf8');
+            else if ([extensionPath+'index.js', extensionPath+'bridge-core.js', extensionPath+'category-filters.js', extensionPath+'event-categories.json'].includes(path)) {
+                body = await readFile(join(root, path.split('/').pop()), 'utf8');
+                if (path.endsWith('.json')) type = 'application/json';
+            }
             else if (path === '/api/chats/save') {
                 type = 'application/json'; body = '{}'; statusCode = failSave ? 503 : 200;
                 if (!failSave) saved++;
@@ -123,6 +126,8 @@ try {
     contextId = (await command('browsingContext.create', { type: 'tab' })).context;
     await command('browsingContext.navigate', { context: contextId, url: origin+'/__ck3_bridge_smoke__', wait: 'complete' });
     await until(() => evaluate('Boolean(document.getElementById("ck3st_connect"))'), 'extension initialization');
+    assert.equal(await evaluate('document.querySelectorAll("#ck3st_categories input").length'), 15);
+    assert.equal(await evaluate('document.getElementById("ck3st_category_panel").open'), false);
     assert.equal(await evaluate('document.getElementById("ck3st_template_game_opened").value'), '*{{user}} opened Crusader Kings III.*');
     await evaluate(`document.getElementById('ck3st_template_options_header').value='*Available choices:*'; document.getElementById('ck3st_template_options_header').dispatchEvent(new Event('input')); true`);
     assert.equal(await evaluate('context.extensionSettings.ck3Bridge.templates.options_header'), '*Available choices:*');
@@ -181,8 +186,51 @@ try {
     assert.equal(await evaluate('window.generations'), 6, 'empty narration must not generate');
     await evaluate(`document.getElementById('ck3st_reset_templates').click(); true`);
     assert.equal(await evaluate('document.getElementById("ck3st_template_options_header").value'), '*Response options:*');
-    assert.equal(saved, 6);
-    console.log('PASS: Firefox pairing/CORS, queueing, retries, editable narration, reset, full event delivery, and single-option choice/reply suppression.');
+    const health = async () => (await fetch(`http://127.0.0.1:${port}/health`, { headers: { 'X-CK3-Token': token } })).json();
+    const consumed = async minimum => {
+        await until(async () => (await health()).latest >= minimum, 'game frames added to outbox');
+        await until(() => evaluate(`JSON.parse(localStorage.getItem('CK3BridgeLocalV1')).cursor>=${minimum}`), 'filtered cursor advancement');
+    };
+    const snapshot = (id, title) => {
+        const fields = { key: `Event: ${id} Character: King`, title, date: '1081.3.22' };
+        return packet('event', { ...fields, body: 'Game prose.', count: '2' })
+            + packet('option', { ...fields, index: '0', text: 'Accept.' })
+            + packet('option', { ...fields, index: '1', text: 'Refuse.' })
+            + packet('choice', { ...fields, text: 'Accept.' });
+    };
+    await evaluate("document.getElementById('ck3st_categories_story').click(); true");
+    assert.equal(await evaluate('document.querySelectorAll("#ck3st_categories input:checked").length'), 12);
+    const beforeCategories = (await health()).latest;
+    await appendFile(join(directory, 'logs/game.log'),
+        snapshot('pay_homage.0101', 'Homage') + snapshot('spymaster_task.0346', 'Secret report')
+        + snapshot('scheme_critical_moments.0011', 'Reminder') + snapshot('char_interaction.0251', 'Contract letter')
+        + snapshot('ep3_decisions_event.2001', 'Governor confirmation')
+        + snapshot('scheme_critical_moments.1001', 'Finale') + snapshot('vassal_interaction.0040', 'Title dispute'));
+    await consumed(beforeCategories + 14);
+    await until(() => evaluate('window.generations===7'), 'one reply for accepted story batch');
+    assert.equal(await evaluate('context.chat.length'), 10, 'only finale and political letter plus their choices survive');
+    assert.equal(await evaluate('context.chat[6].mes.startsWith("Finale") && context.chat[8].mes.startsWith("Title dispute")'), true);
+    assert.equal(await evaluate('context.chat.slice(6).some(m=>/scheme_critical_moments|vassal_interaction|eventKey/.test(m.mes))'), false);
+    await evaluate("document.getElementById('ck3st_category_reports').click(); true");
+    const beforeOrphan = (await health()).latest;
+    await appendFile(join(directory, 'logs/game.log'), packet('choice', {
+        key: 'Event: spymaster_task.0346 Character: King', title: 'Secret report', date: '1081.3.23', text: 'Another response.',
+    }));
+    await consumed(beforeOrphan + 1);
+    assert.equal(await evaluate('context.chat.length'), 10, 're-enabling category cannot admit a skipped parent’s choice');
+    await evaluate("document.getElementById('ck3st_categories_none').click(); true");
+    assert.equal(await evaluate('document.querySelectorAll("#ck3st_categories input:checked").length'), 0);
+    const beforeClear = (await health()).latest;
+    await appendFile(join(directory, 'logs/game.log'), snapshot('scheme_critical_moments.1011', 'Another finale'));
+    await consumed(beforeClear + 2);
+    assert.equal(await evaluate('context.chat.length'), 10);
+    assert.equal(await evaluate('window.generations'), 7, 'filtered batches must not generate');
+    await evaluate("document.getElementById('ck3st_categories_all').click(); true");
+    assert.equal(await evaluate('document.querySelectorAll("#ck3st_categories input:checked").length'), 15);
+    await delay(1800);
+    assert.equal(await evaluate('context.chat.length'), 10, 'Select all must not replay skipped events');
+    assert.equal(saved, 10);
+    console.log('PASS: Firefox queueing/retries, editable narration, single-option suppression, 15 category controls, presets, ID exceptions, and orphan-choice suppression.');
 } finally {
     try { socket?.close(); } catch { /* closed */ }
     firefox?.kill('SIGTERM');

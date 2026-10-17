@@ -5,7 +5,7 @@ records, a local Python companion reads them, and a SillyTavern UI extension add
 ordinary **user messages** to a bound chat. The ST server can run on another host.
 No ST server plugin, OCR, clipboard monitoring, or AI game-control tools are used.
 
-**Version 0.2 is an experimental build.** The companion and frontend are
+**Version 0.3 is an experimental build.** The companion and frontend are
 independently testable. Game-side capture passes event text as explicit string
 scopes to scripted GUI effects that write fixed `info_log` localization records.
 It uses no console commands. The scope-based handoff has been confirmed in-game
@@ -141,7 +141,8 @@ Switching tabs uses a Web Lock and a leader lease to avoid duplicate delivery.
 
 The bridge adds no recurring prompt instructions and does not automatically
 summarize, delete, or prune your chat. ST's normal context selection still applies.
-Use the lifecycle/milestone switches or disable automatic replies to control volume.
+Use the category filters, lifecycle/milestone switches, or disable automatic replies
+to control volume.
 Binding starts from the current end of the companion outbox; bind **before** launch
 or the next events you want to receive. Unbinding disables receiving.
 
@@ -161,10 +162,23 @@ where the player is the principal attacker/defender (start, victory, white peace
 This first build does not claim to capture every toast, alert, battle result,
 activity-log entry, hidden AI event, or custom total-conversion interface.
 
-Semantic event-type checkboxes are feasible without new capture hooks or a server
-plugin. The assessment and proposed category mapping are in
-[docs/event-filtering.md](docs/event-filtering.md); this release keeps the existing
-session/milestone switches and does not yet add category checkboxes.
+**Extensions → CK3 Bridge → Event categories** contains 15 checkboxes in a collapsed
+section, with **Select all**, **Clear all**, and **Story-focused** presets. Existing
+settings initially receive all categories, preserving previous delivery. Story-focused
+turns off routine councillor/secret reports, homage/routine vassal requests, and scheme
+developments. It keeps finales, plot exposure, and the other story categories enabled.
+
+Filters apply when pending records are imported; skipped records advance the cursor,
+stay out of chat, and do not trigger AI generation. Re-enabling a category does not
+replay skipped events or import their orphaned choices. Already saved chat messages
+are unchanged. Life/war milestones follow their subject category as well as their
+master switch; game/session messages use the separate session switch.
+
+The generator indexes installed event IDs using source files and explicit exceptions.
+Unknown or older uncategorized records use **Story chains & other events**, enabled
+by default. Categories and IDs remain internal metadata. See
+[docs/event-filtering.md](docs/event-filtering.md) for the category list, exceptions,
+and remaining classification limits.
 
 To test in normal mode:
 

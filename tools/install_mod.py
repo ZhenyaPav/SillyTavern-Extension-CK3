@@ -6,8 +6,11 @@ import json
 from pathlib import Path
 import re
 import shutil
+import sys
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from companion.category_rules import build_index
 DEFAULT_GAME = ROOT.parent / 'game'
 DEFAULT_MODS = Path.home() / '.local/share/Paradox Interactive/Crusader Kings III/mod'
 
@@ -237,6 +240,9 @@ ck3st_test.1 = {
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(text, encoding='utf-8-sig' if name.endswith(('.yml', '.gui', '.txt')) else 'utf-8')
     manifest['selection_hooks'] = selects
+    index = build_index(data/'events')
+    (destination/'ck3st-event-categories.json').write_text(json.dumps(index, indent=2)+'\n')
+    manifest['category_counts'] = index['counts']
     (destination/'ck3st-generated.json').write_text(json.dumps(manifest, indent=2)+'\n')
     return manifest
 
